@@ -189,6 +189,29 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
     });
   };
 
+  const handleAddChild = (parentId: string) => {
+    const id = uuidv4();
+    dispatchEvent('NODE_CREATED', {
+      nodeId: id,
+      parentId: parentId,
+      initialData: { name: 'New Child' }
+    });
+    // Ensure parent is expanded so we see the new child
+    setExpandedIds(prev => new Set(prev).add(parentId));
+  };
+
+  const handleAddSibling = (referenceId: string) => {
+    const refNode = items.find(i => i[rowKey] === referenceId);
+    if (!refNode) return;
+    
+    const id = uuidv4();
+    dispatchEvent('NODE_CREATED', {
+      nodeId: id,
+      parentId: refNode.parentId,
+      initialData: { name: 'New Sibling' }
+    });
+  };
+
   // --- Drag & Drop Handlers ---
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -412,6 +435,8 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
                 onToggleExpand={() => handleToggleExpand(row[rowKey])}
                 onCellChange={(field, val) => handleCellChange(row[rowKey], field, val)}
                 onDelete={() => handleDelete(row[rowKey])}
+                onAddChild={() => handleAddChild(row[rowKey])}
+                onAddSibling={() => handleAddSibling(row[rowKey])}
                 
                 // Drag Props
                 isDraggable={enableDragAndDrop && mode === 'edit'}

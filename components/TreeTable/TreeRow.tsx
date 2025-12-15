@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown, GripVertical, Trash2, Folder, File } from 'lucide-react';
+import { ChevronRight, ChevronDown, GripVertical, Trash2, Folder, File, Plus, CornerDownRight } from 'lucide-react';
 import { ColumnConfiguration, TreeNode } from '../../types';
 import clsx from 'clsx';
 import { TreeCell } from './TreeCell';
@@ -14,6 +14,8 @@ interface TreeRowProps {
   onToggleExpand: () => void;
   onCellChange: (field: string, value: any) => void;
   onDelete: () => void;
+  onAddChild: () => void;
+  onAddSibling: () => void;
 
   isDraggable: boolean;
   draggedId: string | null;
@@ -34,6 +36,8 @@ export const TreeRow: React.FC<TreeRowProps> = ({
   onToggleExpand,
   onCellChange,
   onDelete,
+  onAddChild,
+  onAddSibling,
   isDraggable,
   draggedId,
   dropTargetId,
@@ -130,9 +134,17 @@ export const TreeRow: React.FC<TreeRowProps> = ({
           />
 
           {/* Actions */}
-          <button onClick={onDelete} className="ml-auto opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 bg-white/80 backdrop-blur-sm rounded px-1">
+             <button onClick={onAddSibling} className="text-gray-400 hover:text-blue-600 p-1" title="Add Sibling">
+               <Plus className="w-3.5 h-3.5" />
+             </button>
+             <button onClick={onAddChild} className="text-gray-400 hover:text-blue-600 p-1" title="Add Child">
+               <CornerDownRight className="w-3.5 h-3.5" />
+             </button>
+             <button onClick={onDelete} className="text-gray-400 hover:text-red-600 p-1" title="Delete">
+               <Trash2 className="w-3.5 h-3.5" />
+             </button>
+          </div>
         </div>
       </td>
 
