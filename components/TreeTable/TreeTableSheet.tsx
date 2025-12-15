@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Sub-components
 import { TreeRow } from './TreeRow';
+import { ColumnConfigPanel } from './ColumnConfigPanel';
 
 const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((props, ref) => {
   const { 
@@ -31,6 +32,7 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
   const [items, setItems] = useState<any[]>(initialData);
   const [columns, setColumns] = useState<ColumnConfiguration[]>(initialColumns);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
   
   // Drag State
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -140,6 +142,10 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
         setItems(prev => prev.filter(i => !allRemovedNodeIds.includes(i[rowKey])));
         break;
       }
+      case 'COLUMN_CONFIG_UPDATED': {
+        setColumns(payload.newConfig);
+        break;
+      }
       case 'IMPORT_COMPLETED': {
         setItems(payload.data);
         if (payload.config) setColumns(payload.config);
@@ -209,6 +215,12 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
       nodeId: id,
       parentId: refNode.parentId,
       initialData: { name: 'New Sibling' }
+    });
+  };
+
+  const handleSaveColumns = (newColumns: ColumnConfiguration[]) => {
+    dispatchEvent('COLUMN_CONFIG_UPDATED', {
+      newConfig: newColumns
     });
   };
 
@@ -347,7 +359,16 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
   }, [columns]);
 
   return (
-    <div className="flex flex-col h-full bg-white border rounded-lg shadow-sm overflow-hidden font-sans">
+    <div className="flex flex-col h-full bg-white border rounded-lg shadow-sm overflow-hidden font-sans relative">
+      
+      {/* Config Panel Modal */}
+      <ColumnConfigPanel 
+        isOpen={isConfigPanelOpen}
+        onClose={() => setIsConfigPanelOpen(false)}
+        currentColumns={columns}
+        onSave={handleSaveColumns}
+      />
+
       {/* Toolbar */}
       <div className="flex items-center justify-between p-3 border-b bg-gray-50">
         <div className="flex items-center gap-2">
@@ -368,7 +389,7 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
             <button onClick={() => alert("Drag file to window to import (not implemented in demo)")} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Import">
               <Upload className="w-4 h-4" />
             </button>
-            <button className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Columns">
+            <button onClick={() => setIsConfigPanelOpen(true)} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Columns">
               <Columns className="w-4 h-4" />
             </button>
           </div>

@@ -73,7 +73,7 @@ export const TreeRow: React.FC<TreeRowProps> = ({
     }
   };
 
-  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault(); // Prevent newline, treat as submit
       e.currentTarget.blur();

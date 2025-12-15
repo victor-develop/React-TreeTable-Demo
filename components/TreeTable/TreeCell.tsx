@@ -39,7 +39,7 @@ export const TreeCell: React.FC<TreeCellProps> = ({ row, column, subColumn, isBu
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && column.type !== 'multiline-text') {
       e.currentTarget.blur();
     }

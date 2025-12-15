@@ -1,3 +1,4 @@
+
 // --- Event Architecture ---
 
 export type TreeTableEventType = 
@@ -33,11 +34,15 @@ export interface NodeDeletedPayload {
   allRemovedNodeIds: string[];
 }
 
+export interface ColumnConfigUpdatedPayload {
+  newConfig: ColumnConfiguration[];
+}
+
 export interface TreeTableEvent {
   id: string;
   timestamp: string;
   type: TreeTableEventType;
-  payload: NodeDataUpdatedPayload | NodeMovedPayload | NodeCreatedPayload | NodeDeletedPayload | any;
+  payload: NodeDataUpdatedPayload | NodeMovedPayload | NodeCreatedPayload | NodeDeletedPayload | ColumnConfigUpdatedPayload | any;
   meta?: Record<string, any>;
 }
 
