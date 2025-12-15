@@ -1,0 +1,5 @@
+{
+  "name": "Event-Sourced Tree Table",
+  "description": "An advanced, event-sourced Tree Table component featuring split-pane layout, drag-and-drop hierarchy management, and dynamic column splitting.",
+  "requestFramePermissions": []
+}
