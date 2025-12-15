@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronRight, ChevronDown, GripVertical, Trash2, Folder, File, Plus, CornerDownRight } from 'lucide-react';
 import { ColumnConfiguration, TreeNode } from '../../types';
 import clsx from 'clsx';
@@ -53,10 +53,19 @@ export const TreeRow: React.FC<TreeRowProps> = ({
 
   // Local state for Name input to prevent excessive events
   const [localName, setLocalName] = useState(row.name || '');
+  const nameInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setLocalName(row.name || '');
   }, [row.name]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (nameInputRef.current) {
+      nameInputRef.current.style.height = 'auto';
+      nameInputRef.current.style.height = `${nameInputRef.current.scrollHeight}px`;
+    }
+  }, [localName]);
 
   const handleNameBlur = () => {
     if (localName !== (row.name || '')) {
@@ -66,6 +75,7 @@ export const TreeRow: React.FC<TreeRowProps> = ({
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault(); // Prevent newline, treat as submit
       e.currentTarget.blur();
     }
   };
@@ -94,47 +104,51 @@ export const TreeRow: React.FC<TreeRowProps> = ({
     >
       {/* Sticky Tree Column */}
       <td 
-        className="sticky left-0 z-20 bg-white group-hover:bg-gray-50 border-r border-b px-2 py-2 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] whitespace-nowrap"
+        className="sticky left-0 z-20 bg-white group-hover:bg-gray-50 border-r border-b px-2 py-2 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] align-top"
       >
         <div 
-          className="flex items-center gap-1"
+          className="flex items-start gap-1"
           style={{ paddingLeft: `${level * 20}px` }}
         >
-          {/* Drag Handle */}
-          {isDraggable && (
-             <span className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-600 p-0.5">
-               <GripVertical className="w-4 h-4" />
+          {/* Wrapper for icons to align them nicely at the top */}
+          <div className="flex items-center gap-1 h-8 mt-0.5 shrink-0">
+             {/* Drag Handle */}
+             {isDraggable && (
+                <span className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-600 p-0.5">
+                  <GripVertical className="w-4 h-4" />
+                </span>
+             )}
+
+             {/* Expander */}
+             <button 
+               onClick={onToggleExpand}
+               className={clsx(
+                 "p-0.5 rounded hover:bg-gray-200 text-gray-500 transition-transform",
+                 !hasChildren && "opacity-0 pointer-events-none"
+               )}
+             >
+               {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+             </button>
+
+             {/* Icon based on children */}
+             <span className="text-gray-400">
+                {hasChildren ? <Folder className="w-4 h-4 text-blue-300" /> : <File className="w-4 h-4" />}
              </span>
-          )}
+          </div>
 
-          {/* Expander */}
-          <button 
-            onClick={onToggleExpand}
-            className={clsx(
-              "p-0.5 rounded hover:bg-gray-200 text-gray-500 transition-transform",
-              !hasChildren && "opacity-0 pointer-events-none"
-            )}
-          >
-            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-
-          {/* Icon based on children */}
-          <span className="text-gray-400">
-             {hasChildren ? <Folder className="w-4 h-4 text-blue-300" /> : <File className="w-4 h-4" />}
-          </span>
-
-          {/* Name/Label Input */}
-          <input 
-            type="text"
+          {/* Name/Label Input - Auto-resizing Textarea */}
+          <textarea 
+            ref={nameInputRef}
+            rows={1}
             value={localName}
             onChange={(e) => setLocalName(e.target.value)}
             onBlur={handleNameBlur}
             onKeyDown={handleNameKeyDown}
-            className="ml-1 bg-transparent border-none focus:ring-1 focus:ring-blue-500 rounded px-1 text-sm font-medium text-gray-700 w-full min-w-[120px]"
+            className="ml-1 bg-transparent border-none focus:ring-1 focus:ring-blue-500 rounded px-1 text-sm font-medium text-gray-700 w-full min-w-[120px] resize-none overflow-hidden py-1.5 leading-5 block"
           />
 
           {/* Actions */}
-          <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 bg-white/80 backdrop-blur-sm rounded px-1">
+          <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 bg-white/80 backdrop-blur-sm rounded px-1 h-8 mt-0.5">
              <button onClick={onAddSibling} className="text-gray-400 hover:text-blue-600 p-1" title="Add Sibling">
                <Plus className="w-3.5 h-3.5" />
              </button>
