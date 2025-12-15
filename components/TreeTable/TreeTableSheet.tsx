@@ -34,24 +34,13 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
   
+  // File Input Ref for Import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   // Drag State
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'inside' | 'after' | null>(null);
-
-  // Sync initial data if it changes significantly (optional based on usage)
-  useEffect(() => {
-    // In a real app, we might need a deep compare here or just rely on the parent 
-    // to not pass new references constantly. For now, we respect the initial load.
-    // However, if the parent drives the data, we should sync.
-    // For this demo, we'll assume the component manages state optimistically 
-    // and this effect is for hard-resets.
-    if (initialData.length !== items.length) {
-        // Simple heuristic to detect external reset
-       setItems(initialData); 
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData]);
 
   // --- Derived Data ---
   const tree = useMemo(() => buildTree(items), [items]);
@@ -94,20 +83,10 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
           const updatedItem = { ...movedItem, parentId: newParentId };
           
           // Insert at new pos
-          // This is tricky for a flat list without sorting logic. 
-          // We usually just update parentId and rely on a 'sortOrder' field if strict ordering is needed.
-          // For this spec, we will append or rely on the buildTree order if we don't have a sort field.
-          // If we want to support visual reordering, we need to manipulate the array order of siblings.
-          
           // Strategy: Find all siblings of newParent, insert at index.
           const siblings = rest.filter(i => i.parentId === newParentId);
-          // Reconstruct array: items before parent's block + siblings before + item + siblings after + rest...
-          // This is complex on a flat array. 
-          // SIMPLIFICATION: We will just update parentId. Reordering within siblings 
-          // requires a 'sortOrder' field which isn't explicitly in the generic T.
-          // However, if we assume the array order MATTERS, we can splice.
           
-          // Let's implement array splicing for visual consistency.
+          // Array Splicing logic
           const siblingsIndices = rest
             .map((item, idx) => ({ item, idx, isSibling: item.parentId === newParentId }))
             .filter(x => x.isSibling);
@@ -117,7 +96,6 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
             return [...rest, updatedItem];
           }
 
-          // In a flat list, inserting "at index 2 of siblings" means finding the global index of the 2nd sibling.
           const insertIndex = newIndex >= siblingsIndices.length 
             ? siblingsIndices[siblingsIndices.length - 1].idx + 1
             : siblingsIndices[newIndex].idx;
@@ -224,16 +202,45 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
     });
   };
 
+  // --- Import Handler ---
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        // Basic validation
+        if (json.data && Array.isArray(json.data)) {
+             dispatchEvent('IMPORT_COMPLETED', {
+               data: json.data,
+               config: json.config || columns
+             });
+        } else {
+            alert("Invalid JSON format: Missing 'data' array in root.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Failed to parse JSON file.");
+      }
+      // Reset input so same file can be selected again
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   // --- Drag & Drop Handlers ---
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     if (!enableDragAndDrop) return;
     setDraggedId(id);
     e.dataTransfer.effectAllowed = 'move';
-    // Firefox requires data to be set
     e.dataTransfer.setData('application/json', JSON.stringify({ id }));
-    
-    // Create ghost image if needed, or rely on browser default
   };
 
   const handleDragOver = (e: React.DragEvent, targetId: string) => {
@@ -248,10 +255,6 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
     const y = e.clientY - rect.top;
     const height = rect.height;
 
-    // Adjusted Logic: Minimize "Inside" zone to prevent accidental reparenting while sorting.
-    // Top 35% = Before
-    // Bottom 35% = After
-    // Middle 30% = Inside
     if (y < height * 0.35) {
       setDropPosition('before');
       setDropTargetId(targetId);
@@ -280,7 +283,7 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
     if (!targetNode || !draggedNode) return;
 
     let newParentId = targetNode.parentId;
-    let newIndex = 0; // Simplified. Real calculation requires finding index in siblings.
+    let newIndex = 0; 
 
     if (dropPosition === 'inside') {
       newParentId = targetId;
@@ -289,9 +292,7 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
       newIndex = children.length;
     } else {
       // Before or After targetId
-      // Find siblings
       const siblings = items.filter(i => i.parentId === targetNode.parentId);
-      // We need strict sorting to determine index. For now using array index.
       const targetIndex = siblings.findIndex(s => s[rowKey] === targetId);
       newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
     }
@@ -303,7 +304,6 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
       newIndex
     });
 
-    // If dropped inside, expand target
     if (dropPosition === 'inside') {
       setExpandedIds(prev => new Set(prev).add(targetId));
     }
@@ -319,7 +319,7 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
       config: columns,
       data: items
     }),
-    openImportDialog: () => alert('Import dialog placeholder'),
+    openImportDialog: handleImportClick,
     triggerExport: (format) => {
       const dataStr = JSON.stringify({ meta: {}, config: columns, data: items }, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
@@ -333,8 +333,6 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
   }));
 
   // --- Render Helpers ---
-
-  // Flatten columns for rendering (handle split columns)
   const renderColumns = useMemo(() => {
     const flat: { 
       config: ColumnConfiguration; 
@@ -361,6 +359,15 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
   return (
     <div className="flex flex-col h-full bg-white border rounded-lg shadow-sm overflow-hidden font-sans relative">
       
+      {/* Hidden File Input */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        className="hidden" 
+        accept=".json"
+      />
+
       {/* Config Panel Modal */}
       <ColumnConfigPanel 
         isOpen={isConfigPanelOpen}
@@ -386,7 +393,7 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
             <button onClick={() => ref && (ref as any).current?.triggerExport('json')} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Export JSON">
               <Download className="w-4 h-4" />
             </button>
-            <button onClick={() => alert("Drag file to window to import (not implemented in demo)")} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Import">
+            <button onClick={handleImportClick} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Import JSON">
               <Upload className="w-4 h-4" />
             </button>
             <button onClick={() => setIsConfigPanelOpen(true)} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Columns">
@@ -397,8 +404,6 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
       </div>
 
       {/* Main Split View Area */}
-      {/* We use a single Grid to maintain row sync perfectly. */}
-      {/* Column 1 is sticky tree. Rest are data. */}
       <div className="flex-1 overflow-auto relative">
         <table className="w-full border-collapse text-sm">
           <thead className="bg-gray-50 sticky top-0 z-30 shadow-sm">
@@ -424,7 +429,6 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
                   >
                     <div className="flex items-center justify-center gap-1">
                       {col.label}
-                      {/* Optional column menu trigger could go here */}
                     </div>
                   </th>
                 );

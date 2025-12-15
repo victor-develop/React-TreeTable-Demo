@@ -79,12 +79,11 @@ function App() {
   };
 
   const handleClear = () => {
-    if (confirm("Are you sure you want to clear the table?")) {
-      setTableData([]);
-      setTableColumns([]);
-      setTableVersion(v => v + 1);
-      setEvents([]);
-    }
+    // Removed confirm dialog to ensure consistent behavior
+    setTableData([]);
+    setTableColumns([]);
+    setTableVersion(v => v + 1);
+    setEvents([]);
   };
 
   return (
