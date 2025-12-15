@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
 import TreeTableSheet from './components/TreeTable/TreeTableSheet';
 import { ColumnConfiguration, TreeTableEvent, TreeTableRef } from './types';
+import { Sparkles, Trash2 } from 'lucide-react';
 
 // --- Mock Data ---
-const initialData = [
+const DEMO_DATA = [
   { id: '1', parentId: null, name: 'Project Alpha', status: 'active', budget: 50000, tags: ['urgent', 'backend'] },
   { id: '1-1', parentId: '1', name: 'Design Phase', status: 'completed', budget: 15000, tags: ['frontend'] },
   { id: '1-2', parentId: '1', name: 'Development', status: 'active', budget: 30000, tags: ['backend', 'urgent'] },
@@ -12,7 +13,7 @@ const initialData = [
   { id: '2', parentId: null, name: 'Marketing Q3', status: 'pending', budget: 20000, tags: [] },
 ];
 
-const initialColumns: ColumnConfiguration[] = [
+const DEMO_COLUMNS: ColumnConfiguration[] = [
   { 
     id: 'status', 
     field: 'status', 
@@ -55,11 +56,35 @@ const initialColumns: ColumnConfiguration[] = [
 function App() {
   const tableRef = useRef<TreeTableRef>(null);
   const [events, setEvents] = useState<TreeTableEvent[]>([]);
+  
+  // State for Table Data & Config
+  // Start clean (empty) as requested
+  const [tableData, setTableData] = useState<any[]>([]);
+  const [tableColumns, setTableColumns] = useState<ColumnConfiguration[]>([]);
+  
+  // Key to force re-mount when resetting data
+  const [tableVersion, setTableVersion] = useState(0);
 
   const handleEvent = (event: TreeTableEvent) => {
     // In a real app, you'd send this to your backend
     console.log('[Event Emitted]', event);
     setEvents(prev => [event, ...prev].slice(0, 20)); // Keep last 20
+  };
+
+  const handleLoadDemo = () => {
+    setTableData(DEMO_DATA);
+    setTableColumns(DEMO_COLUMNS);
+    setTableVersion(v => v + 1);
+    setEvents([]); // Clear log for fresh start
+  };
+
+  const handleClear = () => {
+    if (confirm("Are you sure you want to clear the table?")) {
+      setTableData([]);
+      setTableColumns([]);
+      setTableVersion(v => v + 1);
+      setEvents([]);
+    }
   };
 
   return (
@@ -70,7 +95,23 @@ function App() {
           <h1 className="text-xl font-bold text-gray-800">Event-Sourced Tree Table</h1>
           <p className="text-sm text-gray-500">React + TypeScript + Tailwind + Event Sourcing</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+            {tableData.length === 0 ? (
+               <button 
+                 onClick={handleLoadDemo}
+                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-md hover:from-purple-700 hover:to-indigo-700 shadow-sm transition-all text-sm font-medium"
+               >
+                 <Sparkles className="w-4 h-4" /> Load Demo Data
+               </button>
+            ) : (
+               <button 
+                 onClick={handleClear}
+                 className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-all text-sm font-medium"
+               >
+                 <Trash2 className="w-4 h-4" /> Clear
+               </button>
+            )}
+            <div className="h-6 w-px bg-gray-200 mx-1"></div>
             <a href="https://github.com/google-gemini/react-tree-table" target="_blank" rel="noreferrer" className="text-blue-600 text-sm hover:underline">View Spec</a>
         </div>
       </header>
@@ -81,9 +122,10 @@ function App() {
         {/* Left: The Component */}
         <div className="flex-1 flex flex-col h-full min-w-0">
           <TreeTableSheet
+            key={tableVersion} // Force remount on data reset
             ref={tableRef}
-            data={initialData}
-            columns={initialColumns}
+            data={tableData}
+            columns={tableColumns}
             mode="edit"
             onEvent={handleEvent}
           />
