@@ -89,9 +89,19 @@ export interface TreeTableSheetProps<T = any> {
 
 export interface TreeTableRef {
   getData: () => any[];
+  getColumns: () => ColumnConfiguration[];
   getSnapshot: () => TreeTableSnapshot;
   openImportDialog: () => void;
   triggerExport: (format: 'json' | 'csv') => void;
+  // Programmatic access for AI
+  addNode: (parentId: string | null, data: any) => void;
+  updateNode: (nodeId: string, field: string, value: any) => void;
+  moveNode: (nodeId: string, newParentId: string | null, newIndex: number) => void;
+  deleteNode: (nodeId: string) => void;
+  // Column Operations for AI
+  addColumn: (config: Omit<ColumnConfiguration, 'id'>) => void;
+  updateColumn: (columnId: string, config: Partial<ColumnConfiguration>) => void;
+  deleteColumn: (columnId: string) => void;
 }
 
 // --- Internal Data Helpers ---

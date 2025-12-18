@@ -76,29 +76,22 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
           const movedItem = prev.find(i => i[rowKey] === nodeId);
           if (!movedItem) return prev;
           
-          // Remove from old pos
           let rest = prev.filter(i => i[rowKey] !== nodeId);
-          
-          // Update parent
           const updatedItem = { ...movedItem, parentId: newParentId };
-          
-          // Insert at new pos
-          // Strategy: Find all siblings of newParent, insert at index.
           const siblings = rest.filter(i => i.parentId === newParentId);
           
-          // Array Splicing logic
           const siblingsIndices = rest
             .map((item, idx) => ({ item, idx, isSibling: item.parentId === newParentId }))
             .filter(x => x.isSibling);
           
           if (siblingsIndices.length === 0) {
-            // No siblings, just push to end or maintain relative pos
             return [...rest, updatedItem];
           }
 
-          const insertIndex = newIndex >= siblingsIndices.length 
+          const safeIndex = Math.max(0, Math.min(newIndex, siblingsIndices.length));
+          const insertIndex = safeIndex >= siblingsIndices.length 
             ? siblingsIndices[siblingsIndices.length - 1].idx + 1
-            : siblingsIndices[newIndex].idx;
+            : siblingsIndices[safeIndex].idx;
           
           const newItems = [...rest];
           newItems.splice(insertIndex, 0, updatedItem);
@@ -109,7 +102,6 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
       case 'NODE_CREATED': {
         const { nodeId, parentId, initialData } = payload;
         setItems(prev => [...prev, { ...initialData, [rowKey]: nodeId, parentId }]);
-        // Auto expand parent
         if (parentId) {
             setExpandedIds(prev => new Set(prev).add(parentId));
         }
@@ -155,7 +147,7 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
     });
   };
 
-  const handleDelete = (nodeId: string) => {
+  const internalDelete = (nodeId: string) => {
     const descendants = findAllDescendants(items, nodeId);
     const allRemoved = [nodeId, ...descendants];
     dispatchEvent('NODE_DELETED', {
@@ -169,157 +161,20 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
     dispatchEvent('NODE_CREATED', {
       nodeId: id,
       parentId: null,
-      initialData: { name: 'New Node' } // Default stub
+      initialData: { name: 'New Node' }
     });
-  };
-
-  const handleAddChild = (parentId: string) => {
-    const id = uuidv4();
-    dispatchEvent('NODE_CREATED', {
-      nodeId: id,
-      parentId: parentId,
-      initialData: { name: 'New Child' }
-    });
-    // Ensure parent is expanded so we see the new child
-    setExpandedIds(prev => new Set(prev).add(parentId));
-  };
-
-  const handleAddSibling = (referenceId: string) => {
-    const refNode = items.find(i => i[rowKey] === referenceId);
-    if (!refNode) return;
-    
-    const id = uuidv4();
-    dispatchEvent('NODE_CREATED', {
-      nodeId: id,
-      parentId: refNode.parentId,
-      initialData: { name: 'New Sibling' }
-    });
-  };
-
-  const handleSaveColumns = (newColumns: ColumnConfiguration[]) => {
-    dispatchEvent('COLUMN_CONFIG_UPDATED', {
-      newConfig: newColumns
-    });
-  };
-
-  // --- Import Handler ---
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const json = JSON.parse(e.target?.result as string);
-        // Basic validation
-        if (json.data && Array.isArray(json.data)) {
-             dispatchEvent('IMPORT_COMPLETED', {
-               data: json.data,
-               config: json.config || columns
-             });
-        } else {
-            alert("Invalid JSON format: Missing 'data' array in root.");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Failed to parse JSON file.");
-      }
-      // Reset input so same file can be selected again
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsText(file);
-  };
-
-  // --- Drag & Drop Handlers ---
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    if (!enableDragAndDrop) return;
-    setDraggedId(id);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('application/json', JSON.stringify({ id }));
-  };
-
-  const handleDragOver = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!draggedId || draggedId === targetId) return;
-
-    // Check if dragging parent into child (Cycle detection)
-    const descendants = findAllDescendants(items, draggedId);
-    if (descendants.includes(targetId)) return;
-
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const height = rect.height;
-
-    if (y < height * 0.35) {
-      setDropPosition('before');
-      setDropTargetId(targetId);
-    } else if (y > height * 0.65) {
-      setDropPosition('after');
-      setDropTargetId(targetId);
-    } else {
-      setDropPosition('inside');
-      setDropTargetId(targetId);
-    }
-  };
-
-  const handleDragEnd = () => {
-    setDraggedId(null);
-    setDropTargetId(null);
-    setDropPosition(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!draggedId || !dropPosition) return;
-    
-    // Calculate new parent and index
-    const targetNode = items.find(i => i[rowKey] === targetId);
-    const draggedNode = items.find(i => i[rowKey] === draggedId);
-    if (!targetNode || !draggedNode) return;
-
-    let newParentId = targetNode.parentId;
-    let newIndex = 0; 
-
-    if (dropPosition === 'inside') {
-      newParentId = targetId;
-      // Append to end of children
-      const children = items.filter(i => i.parentId === targetId);
-      newIndex = children.length;
-    } else {
-      // Before or After targetId
-      const siblings = items.filter(i => i.parentId === targetNode.parentId);
-      const targetIndex = siblings.findIndex(s => s[rowKey] === targetId);
-      newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
-    }
-
-    dispatchEvent('NODE_MOVED', {
-      nodeId: draggedId,
-      oldParentId: draggedNode.parentId,
-      newParentId,
-      newIndex
-    });
-
-    if (dropPosition === 'inside') {
-      setExpandedIds(prev => new Set(prev).add(targetId));
-    }
-
-    handleDragEnd();
   };
 
   // --- Imperative Handle ---
   useImperativeHandle(ref, () => ({
     getData: () => items,
+    getColumns: () => columns,
     getSnapshot: () => ({
       meta: { version: '1.0.0', generatedAt: new Date().toISOString() },
       config: columns,
       data: items
     }),
-    openImportDialog: handleImportClick,
+    openImportDialog: () => fileInputRef.current?.click(),
     triggerExport: (format) => {
       const dataStr = JSON.stringify({ meta: {}, config: columns, data: items }, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
@@ -329,6 +184,40 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
       document.body.appendChild(link);
       link.click();
       link.remove();
+    },
+    // AI Operations - Nodes
+    addNode: (parentId, data) => {
+      const id = uuidv4();
+      dispatchEvent('NODE_CREATED', { nodeId: id, parentId, initialData: data || { name: 'New Node' } });
+    },
+    updateNode: (nodeId, field, value) => {
+      handleCellChange(nodeId, field, value);
+    },
+    moveNode: (nodeId, newParentId, newIndex) => {
+      const node = items.find(i => i[rowKey] === nodeId);
+      if (!node) return;
+      dispatchEvent('NODE_MOVED', {
+        nodeId,
+        oldParentId: node.parentId,
+        newParentId,
+        newIndex
+      });
+    },
+    deleteNode: (nodeId) => {
+      internalDelete(nodeId);
+    },
+    // AI Operations - Columns
+    addColumn: (config) => {
+      const newCols = [...columns, { ...config, id: uuidv4() }];
+      dispatchEvent('COLUMN_CONFIG_UPDATED', { newConfig: newCols });
+    },
+    updateColumn: (columnId, config) => {
+      const newCols = columns.map(c => c.id === columnId ? { ...c, ...config } : c);
+      dispatchEvent('COLUMN_CONFIG_UPDATED', { newConfig: newCols });
+    },
+    deleteColumn: (columnId) => {
+      const newCols = columns.filter(c => c.id !== columnId);
+      dispatchEvent('COLUMN_CONFIG_UPDATED', { newConfig: newCols });
     }
   }));
 
@@ -358,25 +247,28 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
 
   return (
     <div className="flex flex-col h-full bg-white border rounded-lg shadow-sm overflow-hidden font-sans relative">
-      
-      {/* Hidden File Input */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        className="hidden" 
-        accept=".json"
-      />
+      <input type="file" ref={fileInputRef} onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          try {
+            const json = JSON.parse(re.target?.result as string);
+            if (json.data && Array.isArray(json.data)) {
+                 dispatchEvent('IMPORT_COMPLETED', { data: json.data, config: json.config || columns });
+            }
+          } catch(err) {}
+        };
+        reader.readAsText(file);
+      }} className="hidden" accept=".json" />
 
-      {/* Config Panel Modal */}
       <ColumnConfigPanel 
         isOpen={isConfigPanelOpen}
         onClose={() => setIsConfigPanelOpen(false)}
         currentColumns={columns}
-        onSave={handleSaveColumns}
+        onSave={(newCols) => dispatchEvent('COLUMN_CONFIG_UPDATED', { newConfig: newCols })}
       />
 
-      {/* Toolbar */}
       <div className="flex items-center justify-between p-3 border-b bg-gray-50">
         <div className="flex items-center gap-2">
            <button onClick={handleAddNode} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
@@ -390,10 +282,10 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
         
         {enableImportExport && (
           <div className="flex items-center gap-2">
-            <button onClick={() => ref && (ref as any).current?.triggerExport('json')} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Export JSON">
+            <button onClick={() => (ref as any).current?.triggerExport('json')} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Export JSON">
               <Download className="w-4 h-4" />
             </button>
-            <button onClick={handleImportClick} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Import JSON">
+            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Import JSON">
               <Upload className="w-4 h-4" />
             </button>
             <button onClick={() => setIsConfigPanelOpen(true)} className="p-2 text-gray-600 hover:bg-gray-200 rounded-md" title="Columns">
@@ -403,38 +295,25 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
         )}
       </div>
 
-      {/* Main Split View Area */}
       <div className="flex-1 overflow-auto relative">
         <table className="w-full border-collapse text-sm">
           <thead className="bg-gray-50 sticky top-0 z-30 shadow-sm">
             <tr>
-              {/* Tree Column Header */}
               <th className="sticky left-0 z-40 bg-gray-50 border-b border-r px-4 py-2 text-left font-semibold text-gray-700 w-80 min-w-[300px] shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
                 Structure
               </th>
-              
-              {/* Dynamic Headers */}
               {columns.map(col => {
-                // Determine colSpan for split columns
                 let span = 1;
                 if (col.type === 'multi-select-split' || col.type === 'single-select-split') {
                   span = (col.options?.length || 0) + (col.enableRowBulkSelect ? 1 : 0);
                 }
-
                 return (
-                  <th 
-                    key={col.id} 
-                    colSpan={span}
-                    className="border-b border-r px-2 py-2 text-center font-semibold text-gray-700 min-w-[100px] group relative"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      {col.label}
-                    </div>
+                  <th key={col.id} colSpan={span} className="border-b border-r px-2 py-2 text-center font-semibold text-gray-700 min-w-[100px]">
+                    {col.label}
                   </th>
                 );
               })}
             </tr>
-            {/* Sub-header row for split columns */}
             {renderColumns.some(rc => rc.subColumn || rc.isBulk) && (
               <tr>
                 <th className="sticky left-0 z-40 bg-gray-50 border-b border-r shadow-[1px_0_0_0_rgba(0,0,0,0.1)]"></th>
@@ -459,19 +338,51 @@ const TreeTableSheet = React.forwardRef<TreeTableRef, TreeTableSheetProps>((prop
                 isExpanded={expandedIds.has(row[rowKey])}
                 onToggleExpand={() => handleToggleExpand(row[rowKey])}
                 onCellChange={(field, val) => handleCellChange(row[rowKey], field, val)}
-                onDelete={() => handleDelete(row[rowKey])}
-                onAddChild={() => handleAddChild(row[rowKey])}
-                onAddSibling={() => handleAddSibling(row[rowKey])}
-                
-                // Drag Props
+                onDelete={() => internalDelete(row[rowKey])}
+                onAddChild={() => {
+                   const id = uuidv4();
+                   dispatchEvent('NODE_CREATED', { nodeId: id, parentId: row[rowKey], initialData: { name: 'New Child' } });
+                }}
+                onAddSibling={() => {
+                   const id = uuidv4();
+                   dispatchEvent('NODE_CREATED', { nodeId: id, parentId: row.parentId, initialData: { name: 'New Sibling' } });
+                }}
                 isDraggable={enableDragAndDrop && mode === 'edit'}
                 draggedId={draggedId}
                 dropTargetId={dropTargetId}
                 dropPosition={dropPosition}
-                onDragStart={(e) => handleDragStart(e, row[rowKey])}
-                onDragOver={(e) => handleDragOver(e, row[rowKey])}
-                onDrop={(e) => handleDrop(e, row[rowKey])}
-                onDragEnd={handleDragEnd}
+                onDragStart={(e) => {
+                  setDraggedId(row[rowKey]);
+                  e.dataTransfer.setData('application/json', JSON.stringify({ id: row[rowKey] }));
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!draggedId || draggedId === row[rowKey]) return;
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  const y = e.clientY - rect.top;
+                  const height = rect.height;
+                  if (y < height * 0.35) setDropPosition('before');
+                  else if (y > height * 0.65) setDropPosition('after');
+                  else setDropPosition('inside');
+                  setDropTargetId(row[rowKey]);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!draggedId || !dropPosition) return;
+                  let newParentId = row.parentId;
+                  let newIndex = 0;
+                  if (dropPosition === 'inside') {
+                    newParentId = row[rowKey];
+                    newIndex = items.filter(i => i.parentId === row[rowKey]).length;
+                  } else {
+                    const siblings = items.filter(i => i.parentId === row.parentId);
+                    const idx = siblings.findIndex(s => s[rowKey] === row[rowKey]);
+                    newIndex = dropPosition === 'before' ? idx : idx + 1;
+                  }
+                  dispatchEvent('NODE_MOVED', { nodeId: draggedId, oldParentId: items.find(i => i[rowKey] === draggedId)?.parentId, newParentId, newIndex });
+                  setDraggedId(null); setDropTargetId(null); setDropPosition(null);
+                }}
+                onDragEnd={() => { setDraggedId(null); setDropTargetId(null); setDropPosition(null); }}
               />
             ))}
             {visibleRows.length === 0 && (
