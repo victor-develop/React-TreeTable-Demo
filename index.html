@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Event-Sourced Tree Table</title>
+    <title>Event-Sourced Tree Table | AI Managed</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -19,7 +20,6 @@
       };
     </script>
     <style>
-      /* Custom scrollbar for cleaner look */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -34,8 +34,6 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #a8a8a8;
       }
-      /* Hide default checkbox to style custom ones if needed, 
-         but we'll use standard accent-color for simplicity and a11y */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -47,18 +45,22 @@
   <script type="importmap">
 {
   "imports": {
-    "clsx": "https://esm.sh/clsx@^2.1.1",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.3.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "clsx": "https://esm.sh/clsx@^2.1.1",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
     "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "uuid": "https://esm.sh/uuid@^13.0.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+    "uuid": "https://esm.sh/uuid@^13.0.0"
   }
 }
 </script>
 </head>
   <body class="bg-gray-50 text-slate-900 antialiased overflow-hidden h-screen w-screen">
     <div id="root" class="h-full w-full"></div>
+    <!-- Vite entry point -->
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
